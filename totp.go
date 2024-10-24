@@ -1,4 +1,4 @@
-package totp
+package otp
 
 import (
 	"crypto/hmac"
@@ -50,24 +50,17 @@ func GenAuthRule(label, issuer, secret, algorithm string, periodDigits ...int) s
 		label, secret, issuer, algorithm, digits, period)
 }
 
-func GenTotp(secret string, algorithm func() hash.Hash, periodDigits ...int) (string, error) {
-	period := PERIOD // 30s
-	digits := DIGITS // %06d
-	numLen := len(periodDigits)
-	if 0 < numLen {
-		period = periodDigits[0]
-	}
-	if 1 < numLen {
-		digits = periodDigits[1]
+func GenHotp(algorithm func() hash.Hash, secret string, idx int64, digits int) (string, error) {
+	if digits < 2 {
+		digits = DIGITS
 	}
 	key, err := base32.StdEncoding.DecodeString(secret)
 	if nil != err {
 		return "", err
 	}
 
-	t := time.Now().Unix() / int64(period)
 	encoder := hmac.New(algorithm, key)
-	_, err = encoder.Write(int64Mem(t))
+	_, err = encoder.Write(int64Mem(idx))
 	if nil != err {
 		return "", err
 	}
@@ -84,4 +77,18 @@ func GenTotp(secret string, algorithm func() hash.Hash, periodDigits ...int) (st
 		code = code[rawLen-digits:]
 	}
 	return code, nil
+}
+
+func GenTotp(algorithm func() hash.Hash, secret string, periodDigits ...int) (string, error) {
+	period := PERIOD // 30s
+	digits := 0
+	numLen := len(periodDigits)
+	if 0 < numLen {
+		period = periodDigits[0]
+	}
+	if 1 < numLen {
+		digits = periodDigits[1]
+	}
+	t := time.Now().Unix() / int64(period)
+	return GenHotp(algorithm, secret, t, digits)
 }
